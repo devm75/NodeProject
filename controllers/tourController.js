@@ -8,20 +8,20 @@ const aliasTopTours = (req, res, next) => {
   next();
 };
 
-const getAllTours = async (req, res) => {
-  // the below find method will return an array
-  // of all the documents and will also very nicely,
-  // convert them into javascript objects.
+// Class APIFeatures is the class for all the features like
+// filtering,sorting,pagination,etc.
+class APIFeatures {
+  // query is the mongoose query, and the queryString is
+  //  the string that we get from express
+  constructor(query, queryString) {
+    this.query = query;
+    this.queryString = queryString;
+  }
 
-  try {
-    // req.query returns the object nicely formatted
-    //  from the query string
-
-    // to implement filtering as we should(avoiding pagination problem)
-
+  filter() {
     // BUILD QUERY
     // 1.A)  Filtering
-    let queryObj = { ...req.query };
+    let queryObj = { ...this.queryString };
     const excludedFields = ['page', 'sort', 'limit', 'fields'];
     excludedFields.forEach((element) => delete queryObj[element]);
 
@@ -32,51 +32,54 @@ const getAllTours = async (req, res) => {
 
     queryObj = JSON.parse(queryStr);
     console.log(queryObj);
+    this.query = this.query.find(queryObj);
+    return this;
+  }
 
-    let query = Tour.find(queryObj);
-
-    //  {difficulty:"easy",durtion:{$gte:5}}
-
-    // 2) Sorting
-
-    if (req.query.sort) {
-      const sortString = req.query.sort.split(',').join(' ');
-      console.log(sortString);
-      query = query.sort(sortString);
+  sort() {
+    if (this.queryString.sort) {
+      const sortString = this.queryString.sort.split(',').join(' ');
+      this.query = this.query.sort(sortString);
     } else {
-      query = query.sort('-createdAt');
+      this.query = this.query.sort('-createdAt');
     }
 
-    // 3) Field Limiting
-    if (req.query.fields) {
-      const fields = req.query.fields.split(',').join(' ');
-      query = query.select(fields);
+    return this;
+  }
+
+  limitFields() {
+    if (this.queryString.fields) {
+      const fields = this.queryString.fields.split(',').join(' ');
+      this.query = this.query.select(fields);
     } else {
-      query = query.select('-__v');
+      this.query = this.query.select('-__v');
     }
 
-    // 4.) Pagination
+    return this;
+  }
 
-    // multiply by one to convert into Number
-    const page = req.query.page * 1 || 1;
-
-    const limit = req.query.limit * 100;
-
+  paginate() {
+    const page = this.queryString.page * 1 || 1;
+    const limit = this.queryString.limit * 1 || 100;
     const skip = (page - 1) * limit;
+    this.query = this.query.skip(skip).limit(limit);
+    return this;
+  }
+}
 
-    // page=2&limit=50
-    // skip here is the amount of results that should be skipped before querying the data
-    query = query.skip(skip).limit(limit);
+const getAllTours = async (req, res) => {
+  // the below find method will return an array
+  // of all the documents and will also very nicely,
+  // convert them into javascript objects.
 
-    if (req.query.page) {
-      const numTours = await Tour.countDocuments();
-      if (skip > numTours) {
-        throw new Error('This Page does not exist');
-      }
-    }
-    // EXECUTE QUERY
-
-    const tours = await query;
+  try {
+    console.log(req.query);
+    const features = new APIFeatures(Tour.find(), req.query)
+      .filter()
+      .sort()
+      .limitFields()
+      .paginate();
+    const tours = await features.query;
 
     // SEND RESPONSE
     res.status(200).json({
