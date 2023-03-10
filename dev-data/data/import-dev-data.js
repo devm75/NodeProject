@@ -1,10 +1,11 @@
 const fs = require('fs');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+dotenv.config({ path: '../.././config.env' });
 const Tour = require('./../../models/tourModel');
 // this line below will read environemnt variables from the
 // config.env file and save them in nodejs environment varialbes
-dotenv.config({ path: '../.././config.env' });
+
 // simply replacing password stirng with our password
 // console.log(process.env.DATABASE);
 // console.log(process.env)

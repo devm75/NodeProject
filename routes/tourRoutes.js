@@ -2,8 +2,7 @@ const express = require('express');
 
 const {
   getAllTours,
-  checkID,
-  checkBody,
+  aliasTopTours,
   getTour,
   deleteTour,
   updateTour,
@@ -13,10 +12,13 @@ const router = express.Router();
 
 // router.param('id', checkID);
 
+// aliasing
+router.route('/top-5-cheap').get(aliasTopTours, getAllTours);
+
 router
   .route('/')
   .get(getAllTours)
-  .post( createTour);
+  .post(createTour);
 
 router
   .route('/:id')

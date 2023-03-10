@@ -1,10 +1,13 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+// we intentionally place the config before initializing process,
+//  so that the process can access it.
+dotenv.config({ path: './config.env' });
 const app = require('./app');
 
 // this line below will read environemnt variables from the
 // config.env file and save them in nodejs environment varialbes
-dotenv.config({ path: './config.env' });
+
 // simply replacing password stirng with our password
 // console.log(process.env.DATABASE);
 const DB = process.env.DATABASE.replace(
@@ -28,11 +31,7 @@ mongoose
   })
   .catch((err) => console.log(err, 'Error while connecting to the database'));
 
-
-
-
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log('server Listening on port 3000');
+  console.log(`server Listening on ${port} `);
 });
-
