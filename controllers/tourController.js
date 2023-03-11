@@ -1,6 +1,7 @@
 const fs = require('fs');
 const Tour = require('./../models/tourModel');
 const APIFeatures = require('./../utils/apiFeatures');
+const catchAsync = require('../utils/catchAsync');
 
 const aliasTopTours = (req, res, next) => {
   (req.query.limit = '5'),
@@ -12,126 +13,128 @@ const aliasTopTours = (req, res, next) => {
 // Class APIFeatures is the class for all the features like
 // filtering,sorting,pagination,etc.
 
-const getAllTours = async (req, res) => {
-  try {
-    console.log(req.query);
-    const features = new APIFeatures(Tour.find(), req.query)
-      .filter()
-      .sort()
-      .limitFields()
-      .paginate();
-    const tours = await features.query;
+const getAllTours = catchAsync(async (req, res) => {
+  const features = new APIFeatures(Tour.find(), req.query)
+    .filter()
+    .sort()
+    .limitFields()
+    .paginate();
+  const tours = await features.query;
 
-    // SEND RESPONSE
-    res.status(200).json({
-      status: 'success',
-      length: tours.length,
-      data: {
-        tours,
+  res.status(200).json({
+    status: 'success',
+    length: tours.length,
+    data: {
+      tours,
+    },
+  });
+});
+
+const getTour = catchAsync(async (req, res) => {
+  const tour = await Tour.findById(req.params.id);
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      tour,
+    },
+  });
+});
+
+const createTour = catchAsync(async (req, res, next) => {
+  const newTour = await Tour.create(req.body);
+
+  res.status(201).json({
+    status: 'success',
+    data: {
+      tour: newTour,
+    },
+  });
+});
+
+const updateTour = catchAsync(async (req, res) => {
+  const tour = await Tour.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true,
+  });
+  res.status(200).json({
+    status: 'success',
+    data: {
+      tour,
+    },
+  });
+});
+
+const deleteTour = catchAsync(async (req, res) => {
+  await Tour.findByIdAndDelete(req.params.id);
+  res.status(200).json({
+    status: 'success',
+  });
+});
+
+const getTourStats = catchAsync(async (req, res) => {
+  const stats = await Tour.aggregate([
+    {
+      $match: { ratingsAverage: { $gte: 4.5 } },
+    },
+    // _id in group tells us what we want to group by
+    {
+      $group: {
+        _id: { $toUpper: '$difficulty' },
+        // _id: '$ratingsAverage',
+        numTours: { $sum: 1 },
+        avgRating: { $avg: '$ratingsAverage' },
+        avgPrice: { $avg: '$price' },
+        minPrice: { $min: '$price' },
+        maxPrice: { $max: '$price' },
+        sumAllTourCost: { $sum: '$price' },
       },
-    });
-  } catch (error) {
-    res.status(404).json({
-      status: 'fail',
-      message: error.message,
-    });
-  }
-};
+    },
+    { $sort: { avgPrice: 1 } },
+    // { $match: { _id: { $ne: 'EASY' } } },
+  ]);
 
-const getTour = async (req, res) => {
-  try {
-    // we are calling in req.param.id because in route , we setup it as
-    // /api/v1/tours/:id ------> if in place of id there was x, we will do
-    // req.param.x
+  res.status(200).json({
+    status: 'success',
+    data: {
+      stats,
+    },
+  });
+});
 
-    // m -1
-    const tour = await Tour.findById(req.params.id);
-
-    // m-2 --> FindById is shorthand for below code
-    //  const tour = await Tour.findOne({_id:req.params.id})
-
-    res.status(200).json({
-      status: 'success',
-      data: {
-        tour,
+const getMonthlyPlan = catchAsync(async (req, res) => {
+  const year = req.params.year * 1;
+  const plan = await Tour.aggregate([
+    {
+      $unwind: { path: '$startDates' },
+    },
+    {
+      $match: {
+        startDates: {
+          $gte: new Date(`${year}-01-01`),
+          $lte: new Date(`${year}-12-31`),
+        },
       },
-    });
-  } catch (error) {
-    res.status(404).json({
-      status: 'fail',
-      message: error,
-    });
-  }
-};
-
-const createTour = async (req, res) => {
-  // two ways here for creating tour
-
-  // M-1
-  // const newTour = new Tour({});
-  // notice below that we are callling save method on newTour object,
-  // not on Tour model.
-  // newTour.save();
-
-  // M-2 here we call create method right no the modal itself
-
-  try {
-    const newTour = await Tour.create(req.body);
-    res.status(201).json({
-      status: 'success',
-      data: {
-        tour: newTour,
+    },
+    {
+      $group: {
+        _id: { $month: '$startDates' },
+        numTourStarts: { $sum: 1 },
+        tours: { $push: '$name' },
       },
-    });
-  } catch (error) {
-    // what sort of error you think we will be getting here, if you think
-    // we create a document with document not passing the validation test,
-    // that will come here as an error and above promise will be rejected
-    // i.e. Tour.create and that rejected Promise will enter the catch
-    // block
-    res.status(400).json({
-      status: 'fail',
-      message: error.message,
-    });
-  }
-};
-
-const updateTour = async (req, res) => {
-  try {
-    // by passing the third argument as new:true, what will happen is
-    // the updated tour will be returned.
-    const tour = await Tour.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
-    res.status(200).json({
-      status: 'success',
-      data: {
-        tour,
-      },
-    });
-  } catch (error) {
-    res.status(404).json({
-      status: 'fail',
-      message: error.message,
-    });
-  }
-};
-
-const deleteTour = async (req, res) => {
-  try {
-    await Tour.findByIdAndDelete(req.params.id);
-    res.status(200).json({
-      status: 'success',
-    });
-  } catch (error) {
-    console.log(error);
-    res.status(404).json({
-      status: 'fail',
-      message: error.message,
-    });
-  }
-};
+    },
+    { $addFields: { month: '$_id' } },
+    // if 0, then field won't show up
+    { $project: { _id: 0 } },
+    { $sort: { numTourStarts: -1 } },
+  ]);
+  res.status(200).json({
+    status: 'success',
+    data: {
+      plan,
+    },
+  });
+});
 
 module.exports = {
   aliasTopTours,
@@ -140,4 +143,6 @@ module.exports = {
   deleteTour,
   updateTour,
   createTour,
+  getTourStats,
+  getMonthlyPlan,
 };
