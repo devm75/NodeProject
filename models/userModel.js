@@ -67,6 +67,12 @@ userSchema.pre('save', async function(next) {
   next();
 });
 
+userSchema.pre('save', function(next) {
+  if (!this.isModified('password') || this.isNew) return next();
+  this.passwordChangedAt = Date.now() - 1000;
+  next();
+});
+
 // Now we are gonna create something called and instance method,
 // It is basically a method that is gonna be available on all documents
 // of a certain collection.Since these instance methods are available on
@@ -83,6 +89,7 @@ userSchema.methods.correctPassword = async function(
   candidatePassword,
   userPassword
 ) {
+  console.log(candidatePassword, userPassword, 'Passwords Logged!');
   return await bcrypt.compare(candidatePassword, userPassword);
 };
 

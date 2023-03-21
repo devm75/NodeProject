@@ -28,7 +28,7 @@ router.route('/monthly-plan/:year').get(getMonthlyPlan);
 // return error (if not authorised) or gonna call the next middleware
 router
   .route('/')
-  .get(getAllTours)
+  .get(protect,getAllTours)
   .post(createTour);
 
 router
